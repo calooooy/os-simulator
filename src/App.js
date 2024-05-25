@@ -33,6 +33,7 @@ const App = () => {
   const [processes, setProcesses] = useState([]);
   const [memory, setMemory] = useState(new Array(100).fill(null));
   const [jobQueue, setJobQueue] = useState([]);
+  const [key, setKey] = useState(0); // Add a key state
   const processIdRef = useRef(1);
   const currentTimeRef = useRef(0); // Reference to keep track of current time
   const nextArrivalTimeRef = useRef(0); // Reference to the next arrival time
@@ -70,8 +71,8 @@ const App = () => {
     processIdRef.current = 1;
     currentTimeRef.current = 0; // Reset current time when a new policy is selected
     nextArrivalTimeRef.current = 0; // Reset next arrival time when a new policy is selected
+    setKey(prevKey => prevKey + 1); // Update the key to force re-render
   };
-
 
   const runProcess = () => {
     setProcesses((prevProcesses) => {
@@ -208,6 +209,7 @@ const App = () => {
       <Menu onSelectPolicy={handleSelectPolicy} />
       {policy && <h3>Current Policy: {policy}</h3>}
       <MemoryManagement
+        key={key} // Add key prop here
         processes={processes}
         memory={memory}
         setMemory={setMemory}

@@ -5,6 +5,10 @@ const MemoryManagement = ({ processes, memory, setMemory, jobQueue, setJobQueue 
   const maxJobsBeforeScroll = 15;
 
   useEffect(() => {
+    setJobQueueTableData(jobQueue);
+  }, [jobQueue]);
+
+  useEffect(() => {
     const updatedJobQueueTableData = [...jobQueueTableData];
 
     processes.forEach((process) => {
