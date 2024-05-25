@@ -66,6 +66,10 @@ const MemoryManagement = ({ processes, memory, setMemory, jobQueue, setJobQueue 
     return process ? process.color : 'white';
   };
 
+  const getRowStyle = (process) => {
+    return process.status === 'Running' ? { backgroundColor: getColor(process.id) } : {};
+  };
+
   return (
     <div>
       <h2>Memory Management</h2>
@@ -86,7 +90,7 @@ const MemoryManagement = ({ processes, memory, setMemory, jobQueue, setJobQueue 
               </thead>
               <tbody>
                 {processes.map((process, index) => (
-                  <tr key={index}>
+                  <tr key={index} style={getRowStyle(process)}>
                     <td>{process.id}</td>
                     <td>{process.burstTime}</td>
                     <td>{process.memorySize}</td>

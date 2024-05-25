@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Menu from './components/Menu';
 import MemoryManagement from './components/MemoryManagement';
 
+
 const colors = [
   '#FF6633', '#FFB399', '#FF33FF', '#FFFF99', '#00B3E6', 
   '#E6B333', '#3366E6', '#999966', '#99FF99', '#B34D4D',
@@ -47,7 +48,7 @@ const App = () => {
   
         // Update the next arrival time
         nextArrivalTimeRef.current = newProcess.arrivalTime;
-      }, 500); // Generate new process every 5 seconds instead of every second
+      }, 3000); // Generate new process every 5 seconds instead of every second
   
       const executionInterval = setInterval(() => {
         runProcess();
@@ -76,7 +77,7 @@ const App = () => {
 
   const runProcess = () => {
     setProcesses((prevProcesses) => {
-      let updatedProcesses = [...prevProcesses];
+      const updatedProcesses = prevProcesses.map(process => ({ ...process }));
 
       if (policy === 'FCFS') {
         // FCFS policy
@@ -94,66 +95,91 @@ const App = () => {
           }
         }
       } else if (policy === 'SJF') {
-        // SJF policy
+        // SJF Preemptive policy
         const runningProcess = updatedProcesses.find(p => p.status === 'Running');
+        const readyProcesses = updatedProcesses.filter(p => p.status === 'Ready');
+
         if (runningProcess) {
-          runningProcess.burstTime -= 1;
-          if (runningProcess.burstTime <= 0) {
-            runningProcess.status = 'Terminated';
-            deallocateMemory(runningProcess);
-          }
-        } else {
-          const readyProcesses = updatedProcesses.filter(p => p.status === 'Ready');
-          if (readyProcesses.length > 0) {
-            readyProcesses.sort((a, b) => a.burstTime - b.burstTime);
-            const nextProcess = readyProcesses[0];
-            nextProcess.status = 'Running';
-          }
+            runningProcess.burstTime -= 1;
+            if (runningProcess.burstTime <= 0) {
+                runningProcess.status = 'Terminated';
+                deallocateMemory(runningProcess);
+            }
         }
-      } else if (policy === 'Priority') {
-        // Priority policy
+
+        if (readyProcesses.length > 0) {
+            const shortestJob = readyProcesses.sort((a, b) => a.burstTime - b.burstTime)[0];
+            if (runningProcess) {
+                if (shortestJob.burstTime < runningProcess.burstTime) {
+                    runningProcess.status = 'Ready';
+                    shortestJob.status = 'Running';
+                }
+            } else {
+                shortestJob.status = 'Running';
+            }
+        }
+    } else if (policy === 'Priority') {
+        // Priority Preemptive policy
         const runningProcess = updatedProcesses.find(p => p.status === 'Running');
+        const readyProcesses = updatedProcesses.filter(p => p.status === 'Ready');
         if (runningProcess) {
           runningProcess.burstTime -= 1;
           if (runningProcess.burstTime <= 0) {
             runningProcess.status = 'Terminated';
             deallocateMemory(runningProcess);
+          } else {
+            const highestPriorityProcess = readyProcesses.sort((a, b) => a.priority - b.priority)[0];
+            if (highestPriorityProcess && highestPriorityProcess.priority < runningProcess.priority) {
+              runningProcess.status = 'Ready';
+              highestPriorityProcess.status = 'Running';
+            }
           }
         } else {
-          const readyProcesses = updatedProcesses.filter(p => p.status === 'Ready');
           if (readyProcesses.length > 0) {
-            readyProcesses.sort((a, b) => a.priority - b.priority);
-            const nextProcess = readyProcesses[0];
-            nextProcess.status = 'Running';
+            const highestPriorityProcess = readyProcesses.sort((a, b) => a.priority - b.priority)[0];
+            highestPriorityProcess.status = 'Running';
           }
         }
       } else if (policy === 'RR') {
-        // Round Robin policy
-        const quantum = 2; // Example: Quantum size
         const runningProcess = updatedProcesses.find(p => p.status === 'Running');
+        const readyProcesses = updatedProcesses.filter(p => p.status === 'Ready');
+      
         if (runningProcess) {
           runningProcess.burstTime -= 1;
           runningProcess.quantumLeft -= 1;
+      
           if (runningProcess.burstTime <= 0) {
             runningProcess.status = 'Terminated';
             deallocateMemory(runningProcess);
           } else if (runningProcess.quantumLeft <= 0) {
             runningProcess.status = 'Ready';
-            updatedProcesses.push(updatedProcesses.shift()); // Move the process to the end of the queue
-            const nextProcess = updatedProcesses.find(p => p.status === 'Ready');
-            if (nextProcess) {
-              nextProcess.status = 'Running';
-              nextProcess.quantumLeft = quantum;
-            }
+            readyProcesses.push(runningProcess); // Push the preempted process back to the queue
           }
-        } else {
-          const nextProcess = updatedProcesses.find(p => p.status === 'Ready');
+        }
+      
+        if (!runningProcess && readyProcesses.length > 0) {
+          const nextProcess = readyProcesses.shift(); // Get the first process from the queue
+          nextProcess.status = 'Running';
+          nextProcess.quantumLeft = 2; // Reset the quantum for the new running process
+          readyProcesses.push(nextProcess); // Push it to the end of the queue
+        } else if (runningProcess && runningProcess.burstTime > 0 && runningProcess.quantumLeft <= 0) {
+          const nextProcess = readyProcesses.shift(); // Get the first process from the queue
           if (nextProcess) {
+            runningProcess.status = 'Ready';
+            readyProcesses.push(runningProcess); // Push the preempted process back to the queue
             nextProcess.status = 'Running';
-            nextProcess.quantumLeft = quantum;
+            nextProcess.quantumLeft = 2; // Reset the quantum for the new running process
+            readyProcesses.push(nextProcess); // Push it to the end of the queue
           }
         }
       }
+      
+      
+      
+      
+      
+      
+      
 
       // Check if there are processes in the job queue that can be allocated memory
       const updatedJobQueue = [];
