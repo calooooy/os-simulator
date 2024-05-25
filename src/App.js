@@ -15,55 +15,63 @@ const colors = [
   '#E64D66', '#4DB380', '#FF4D4D', '#99E6E6', '#6666FF'
 ];
 
-const generateProcess = (id, arrivalTime) => {
+const generateProcess = (id, currentTime) => {
   return {
     id,
-    burstTime: Math.min(Math.floor(Math.random() * 20) + 1, 20), // Limit burst time to maximum of 20
-    memorySize: Math.floor(Math.random() * 20) + 1, // assuming smaller memory size for demo
-    arrivalTime,
+    burstTime: Math.min(Math.floor(Math.random() * 20) + 1, 20),
+    memorySize: Math.floor(Math.random() * 20) + 1,
+    arrivalTime: currentTime + Math.floor(Math.random() * 5) + 1, // Relative to current time
     priority: Math.floor(Math.random() * 10) + 1,
     status: 'New',
     color: colors[id % colors.length],
-    quantumLeft: 0 // Initialize quantumLeft for Round Robin
+    quantumLeft: 0
   };
 };
 
 const App = () => {
   const [policy, setPolicy] = useState('');
   const [processes, setProcesses] = useState([]);
-  const [memory, setMemory] = useState(new Array(100).fill(null)); // assuming 100 units of memory
-  const [jobQueue, setJobQueue] = useState([]); // Job queue for waiting processes
+  const [memory, setMemory] = useState(new Array(100).fill(null));
+  const [jobQueue, setJobQueue] = useState([]);
   const processIdRef = useRef(1);
-  const arrivalTimeRef = useRef(0);
+  const currentTimeRef = useRef(0); // Reference to keep track of current time
+  const nextArrivalTimeRef = useRef(0); // Reference to the next arrival time
 
   useEffect(() => {
     if (policy) {
       const interval = setInterval(() => {
-        const newProcess = generateProcess(processIdRef.current, arrivalTimeRef.current);
-        processIdRef.current += 1;  // Increment process ID for the next process
-        arrivalTimeRef.current += 1; // Increment arrival time for the next process
+        const newProcess = generateProcess(processIdRef.current, currentTimeRef.current);
+        processIdRef.current += 1;
         setProcesses((prevProcesses) => [...prevProcesses, newProcess]);
-      }, 2000);
-
+  
+        // Update the next arrival time
+        nextArrivalTimeRef.current = newProcess.arrivalTime;
+      }, 500); // Generate new process every 5 seconds instead of every second
+  
       const executionInterval = setInterval(() => {
         runProcess();
+        // Increment the current time
+        currentTimeRef.current += 1;
       }, 1000); // Run the scheduler every second
-
+  
       return () => {
         clearInterval(interval);
         clearInterval(executionInterval);
       };
     }
   }, [policy]);
+  
 
   const handleSelectPolicy = (selectedPolicy) => {
     setPolicy(selectedPolicy);
     setProcesses([]);
-    setMemory(new Array(100).fill(null));  // Reset memory
-    setJobQueue([]); // Reset job queue
-    processIdRef.current = 1;  // Reset process ID counter when a new policy is selected
-    arrivalTimeRef.current = 0; // Reset arrival time counter when a new policy is selected
+    setMemory(new Array(100).fill(null));
+    setJobQueue([]);
+    processIdRef.current = 1;
+    currentTimeRef.current = 0; // Reset current time when a new policy is selected
+    nextArrivalTimeRef.current = 0; // Reset next arrival time when a new policy is selected
   };
+
 
   const runProcess = () => {
     setProcesses((prevProcesses) => {
@@ -204,7 +212,7 @@ const App = () => {
         memory={memory}
         setMemory={setMemory}
         jobQueue={jobQueue}
-        setJobQueue={setJobQueue} // Pass the setJobQueue function
+        setJobQueue={setJobQueue}
       />
     </div>
   );

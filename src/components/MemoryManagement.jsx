@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 const MemoryManagement = ({ processes, memory, setMemory, jobQueue, setJobQueue }) => {
   const [jobQueueTableData, setJobQueueTableData] = useState([]);
-  const maxJobsBeforeScroll = 15; // Maximum number of jobs before adding a scrollbar
+  const maxJobsBeforeScroll = 15;
 
   useEffect(() => {
     const updatedJobQueueTableData = [...jobQueueTableData];
@@ -19,43 +19,42 @@ const MemoryManagement = ({ processes, memory, setMemory, jobQueue, setJobQueue 
   }, [processes]);
 
   const allocateMemory = (process, updatedJobQueueTableData) => {
-    const freeSpaces = []; // Array to store available spaces
-    let currentBlockSize = 0; // Variable to track the size of the current free space
-    let bestFitIndex = -1; // Index of the best fit block
-    let bestFitSize = Infinity; // Size of the best fit block
+    const freeSpaces = [];
+    let currentBlockSize = 0;
+    let bestFitIndex = -1;
+    let bestFitSize = Infinity;
 
-    // Iterate through memory to find available spaces
     for (let i = 0; i < memory.length; i++) {
       if (memory[i] === null) {
-        currentBlockSize++; // Increase the size of the current free space
-        if (currentBlockSize >= process.memorySize) { // If current free space is large enough
-          if (currentBlockSize < bestFitSize) { // Check if it's the best fit so far
-            bestFitIndex = i - currentBlockSize + 1; // Update best fit index
-            bestFitSize = currentBlockSize; // Update best fit size
+        currentBlockSize++;
+        if (currentBlockSize >= process.memorySize) {
+          if (currentBlockSize < bestFitSize) {
+            bestFitIndex = i - currentBlockSize + 1;
+            bestFitSize = currentBlockSize;
           }
         }
       } else {
-        currentBlockSize = 0; // Reset the current free space size
+        currentBlockSize = 0;
       }
     }
 
-    // If a best fit block is found
     if (bestFitIndex !== -1) {
       const newMemory = [...memory];
       for (let i = bestFitIndex; i < bestFitIndex + process.memorySize; i++) {
-        newMemory[i] = process.id; // Allocate memory for the process
+        newMemory[i] = process.id;
       }
       setMemory(newMemory);
       process.status = 'Ready';
     } else {
-      // Change the process status to 'Waiting' before adding to the job queue
       process.status = 'Waiting';
       updatedJobQueueTableData.push(process);
     }
   };
 
   const deallocateMemory = (process) => {
-    setMemory(memory.map((unit) => (unit === process.id ? null : unit)));
+    setMemory((prevMemory) =>
+      prevMemory.map((unit) => (unit === process.id ? null : unit))
+    );
   };
 
   const getColor = (processId) => {
@@ -70,7 +69,7 @@ const MemoryManagement = ({ processes, memory, setMemory, jobQueue, setJobQueue 
         <div style={{ flex: 1, marginRight: '20px' }}>
           <h3>PCB</h3>
           <div style={{ overflowY: 'scroll', height: '400px' }}>
-            <table>
+            <table style={{ width: '100%', textAlign: 'center' }}>
               <thead>
                 <tr>
                   <th>Process ID</th>
@@ -99,7 +98,7 @@ const MemoryManagement = ({ processes, memory, setMemory, jobQueue, setJobQueue 
         <div style={{ flex: 1 }}>
           <h3>Job Queue</h3>
           <div style={{ maxHeight: jobQueueTableData.length > maxJobsBeforeScroll ? '300px' : 'auto', overflowY: 'auto' }}>
-            <table>
+            <table style={{ width: '100%', textAlign: 'center' }}>
               <thead>
                 <tr>
                   <th>Process ID</th>
@@ -136,7 +135,10 @@ const MemoryManagement = ({ processes, memory, setMemory, jobQueue, setJobQueue 
                 width: '30px', 
                 height: '30px', 
                 border: '1px solid black', 
-                backgroundColor: getColor(unit) 
+                backgroundColor: getColor(unit),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}
             >
               {unit}
