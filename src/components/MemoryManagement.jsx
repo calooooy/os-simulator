@@ -1,18 +1,24 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 
-const MemoryManagement = ({ processes, memory, setMemory }) => {
+const MemoryManagement = ({ processes, memory, setMemory, jobQueue, setJobQueue }) => {
+  const [jobQueueTableData, setJobQueueTableData] = useState([]);
+  const maxJobsBeforeScroll = 15; // Maximum number of jobs before adding a scrollbar
 
   useEffect(() => {
+    const updatedJobQueueTableData = [...jobQueueTableData];
+
     processes.forEach((process) => {
       if (process.status === 'New') {
-        allocateMemory(process);
+        allocateMemory(process, updatedJobQueueTableData);
       } else if (process.status === 'Terminated') {
         deallocateMemory(process);
       }
     });
+
+    setJobQueueTableData(updatedJobQueueTableData);
   }, [processes]);
 
-  const allocateMemory = (process) => {
+  const allocateMemory = (process, updatedJobQueueTableData) => {
     const freeSpaces = []; // Array to store available spaces
     let currentBlockSize = 0; // Variable to track the size of the current free space
     let bestFitIndex = -1; // Index of the best fit block
@@ -42,7 +48,9 @@ const MemoryManagement = ({ processes, memory, setMemory }) => {
       setMemory(newMemory);
       process.status = 'Ready';
     } else {
-      process.status = 'Waiting'; // If no suitable block is found, set process status to 'Waiting'
+      // Change the process status to 'Waiting' before adding to the job queue
+      process.status = 'Waiting';
+      updatedJobQueueTableData.push(process);
     }
   };
 
@@ -58,20 +66,83 @@ const MemoryManagement = ({ processes, memory, setMemory }) => {
   return (
     <div>
       <h2>Memory Management</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '5px' }}>
-        {memory.map((unit, index) => (
-          <div 
-            key={index} 
-            style={{ 
-              width: '30px', 
-              height: '30px', 
-              border: '1px solid black', 
-              backgroundColor: getColor(unit) 
-            }}
-          >
-            {unit}
+      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+        <div style={{ flex: 1, marginRight: '20px' }}>
+          <h3>PCB</h3>
+          <div style={{ overflowY: 'scroll', height: '400px' }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Process ID</th>
+                  <th>Burst Time</th>
+                  <th>Memory Size</th>
+                  <th>Arrival Time</th>
+                  {processes.some(p => p.priority !== undefined) && <th>Priority</th>}
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {processes.map((process, index) => (
+                  <tr key={index}>
+                    <td>{process.id}</td>
+                    <td>{process.burstTime}</td>
+                    <td>{process.memorySize}</td>
+                    <td>{process.arrivalTime}</td>
+                    {process.priority !== undefined && <td>{process.priority}</td>}
+                    <td>{process.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        ))}
+        </div>
+        <div style={{ flex: 1 }}>
+          <h3>Job Queue</h3>
+          <div style={{ maxHeight: jobQueueTableData.length > maxJobsBeforeScroll ? '300px' : 'auto', overflowY: 'auto' }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Process ID</th>
+                  <th>Burst Time</th>
+                  <th>Memory Size</th>
+                  <th>Arrival Time</th>
+                  <th>Priority</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jobQueueTableData.map((process) => (
+                  <tr key={process.id}>
+                    <td>{process.id}</td>
+                    <td>{process.burstTime}</td>
+                    <td>{process.memorySize}</td>
+                    <td>{process.arrivalTime}</td>
+                    <td>{process.priority}</td>
+                    <td>{process.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3>Memory Allocation</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '5px' }}>
+          {memory.map((unit, index) => (
+            <div 
+              key={index} 
+              style={{ 
+                width: '30px', 
+                height: '30px', 
+                border: '1px solid black', 
+                backgroundColor: getColor(unit) 
+              }}
+            >
+              {unit}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Menu from './components/Menu';
-import PCB from './components/PCB';
 import MemoryManagement from './components/MemoryManagement';
 
 const colors = [
@@ -24,16 +23,16 @@ const generateProcess = (id, arrivalTime) => {
     arrivalTime,
     priority: Math.floor(Math.random() * 10) + 1,
     status: 'New',
-    color: colors[id % colors.length]
+    color: colors[id % colors.length],
+    quantumLeft: 0 // Initialize quantumLeft for Round Robin
   };
 };
-
-
 
 const App = () => {
   const [policy, setPolicy] = useState('');
   const [processes, setProcesses] = useState([]);
   const [memory, setMemory] = useState(new Array(100).fill(null)); // assuming 100 units of memory
+  const [jobQueue, setJobQueue] = useState([]); // Job queue for waiting processes
   const processIdRef = useRef(1);
   const arrivalTimeRef = useRef(0);
 
@@ -61,6 +60,7 @@ const App = () => {
     setPolicy(selectedPolicy);
     setProcesses([]);
     setMemory(new Array(100).fill(null));  // Reset memory
+    setJobQueue([]); // Reset job queue
     processIdRef.current = 1;  // Reset process ID counter when a new policy is selected
     arrivalTimeRef.current = 0; // Reset arrival time counter when a new policy is selected
   };
@@ -68,7 +68,7 @@ const App = () => {
   const runProcess = () => {
     setProcesses((prevProcesses) => {
       let updatedProcesses = [...prevProcesses];
-  
+
       if (policy === 'FCFS') {
         // FCFS policy
         const runningProcess = updatedProcesses.find(p => p.status === 'Running');
@@ -145,12 +145,49 @@ const App = () => {
           }
         }
       }
-  
+
+      // Check if there are processes in the job queue that can be allocated memory
+      const updatedJobQueue = [];
+      for (const process of jobQueue) {
+        const freeSpaces = []; // Array to store available spaces
+        let currentBlockSize = 0; // Variable to track the size of the current free space
+        let bestFitIndex = -1; // Index of the best fit block
+        let bestFitSize = Infinity; // Size of the best fit block
+
+        // Iterate through memory to find available spaces
+        for (let i = 0; i < memory.length; i++) {
+          if (memory[i] === null) {
+            currentBlockSize++; // Increase the size of the current free space
+            if (currentBlockSize >= process.memorySize) { // If current free space is large enough
+              if (currentBlockSize < bestFitSize) { // Check if it's the best fit so far
+                bestFitIndex = i - currentBlockSize + 1; // Update best fit index
+                bestFitSize = currentBlockSize; // Update best fit size
+              }
+            }
+          } else {
+            currentBlockSize = 0; // Reset the current free space size
+          }
+        }
+
+        // If a best fit block is found
+        if (bestFitIndex !== -1) {
+          const newMemory = [...memory];
+          for (let i = bestFitIndex; i < bestFitIndex + process.memorySize; i++) {
+            newMemory[i] = process.id; // Allocate memory for the process
+          }
+          setMemory(newMemory);
+          process.status = 'Ready'; // Update the process status to 'Ready'
+          updatedProcesses.push(process);
+        } else {
+          // If no suitable block is found, keep the process in the job queue
+          updatedJobQueue.push(process);
+        }
+      }
+      setJobQueue(updatedJobQueue);
+
       return updatedProcesses;
     });
   };
-  
-  
 
   const deallocateMemory = (process) => {
     setMemory((prevMemory) =>
@@ -162,8 +199,13 @@ const App = () => {
     <div>
       <Menu onSelectPolicy={handleSelectPolicy} />
       {policy && <h3>Current Policy: {policy}</h3>}
-      <PCB processes={processes} />
-      <MemoryManagement processes={processes} memory={memory} setMemory={setMemory} />
+      <MemoryManagement
+        processes={processes}
+        memory={memory}
+        setMemory={setMemory}
+        jobQueue={jobQueue}
+        setJobQueue={setJobQueue} // Pass the setJobQueue function
+      />
     </div>
   );
 };
