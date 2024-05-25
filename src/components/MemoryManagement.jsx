@@ -72,7 +72,7 @@ const MemoryManagement = ({ processes, memory, setMemory, jobQueue, setJobQueue 
 
   return (
     <div>
-      <h2>Memory Management</h2>
+      {/* <h2>Memory Management</h2> */}
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
         <div style={{ flex: 1, marginRight: '20px' }}>
           <h3>PCB</h3>

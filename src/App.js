@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import Menu from './components/Menu';
 import MemoryManagement from './components/MemoryManagement';
 
-
 const colors = [
   '#FF6633', '#FFB399', '#FF33FF', '#FFFF99', '#00B3E6', 
   '#E6B333', '#3366E6', '#999966', '#99FF99', '#B34D4D',
@@ -31,6 +30,7 @@ const generateProcess = (id, currentTime) => {
 
 const App = () => {
   const [policy, setPolicy] = useState('');
+  const [isPlaying, setIsPlaying] = useState(false); // New state for play/pause
   const [processes, setProcesses] = useState([]);
   const [memory, setMemory] = useState(new Array(100).fill(null));
   const [jobQueue, setJobQueue] = useState([]);
@@ -38,9 +38,10 @@ const App = () => {
   const processIdRef = useRef(1);
   const currentTimeRef = useRef(0); // Reference to keep track of current time
   const nextArrivalTimeRef = useRef(0); // Reference to the next arrival time
+  const timerRef = useRef(null); // Reference to the timer interval
 
   useEffect(() => {
-    if (policy) {
+    if (policy && isPlaying) { // Check if policy is selected and simulation is playing
       const interval = setInterval(() => {
         const newProcess = generateProcess(processIdRef.current, currentTimeRef.current);
         processIdRef.current += 1;
@@ -48,7 +49,7 @@ const App = () => {
   
         // Update the next arrival time
         nextArrivalTimeRef.current = newProcess.arrivalTime;
-      }, 3000); // Generate new process every 5 seconds instead of every second
+      }, 500); // Generate new process every 5 seconds instead of every second
   
       const executionInterval = setInterval(() => {
         runProcess();
@@ -61,11 +62,13 @@ const App = () => {
         clearInterval(executionInterval);
       };
     }
-  }, [policy]);
+  }, [policy, isPlaying]); // Update effect when policy or isPlaying state changes
+  
   
 
   const handleSelectPolicy = (selectedPolicy) => {
     setPolicy(selectedPolicy);
+    setIsPlaying(false);
     setProcesses([]);
     setMemory(new Array(100).fill(null));
     setJobQueue([]);
@@ -230,12 +233,32 @@ const App = () => {
     );
   };
 
+  const handlePlayPause = (play) => {
+    setIsPlaying(play);
+  };
+
+  const handleNext = () => {
+    
+  };
+
+  const handleReset = () => {
+    // setPolicy('');
+    setIsPlaying(false);
+    setProcesses([]);
+    setMemory(new Array(100).fill(null));
+    setJobQueue([]);
+    processIdRef.current = 1;
+    currentTimeRef.current = 0;
+    nextArrivalTimeRef.current = 0;
+    setKey(prevKey => prevKey + 1);
+  };
+
   return (
     <div>
-      <Menu onSelectPolicy={handleSelectPolicy} />
+      <Menu onSelectPolicy={handleSelectPolicy} onPlayPause={handlePlayPause} onNext={handleNext} onReset={handleReset} isPlaying={isPlaying} />
       {policy && <h3>Current Policy: {policy}</h3>}
       <MemoryManagement
-        key={key} // Add key prop here
+        key={key}
         processes={processes}
         memory={memory}
         setMemory={setMemory}
