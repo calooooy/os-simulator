@@ -13,20 +13,36 @@ const MemoryManagement = ({ processes, memory, setMemory }) => {
   }, [processes]);
 
   const allocateMemory = (process) => {
-    const freeSpaces = memory.reduce((acc, curr, index) => {
-      if (curr === null) acc.push(index);
-      return acc;
-    }, []);
+    const freeSpaces = []; // Array to store available spaces
+    let currentBlockSize = 0; // Variable to track the size of the current free space
+    let bestFitIndex = -1; // Index of the best fit block
+    let bestFitSize = Infinity; // Size of the best fit block
 
-    if (freeSpaces.length >= process.memorySize) {
+    // Iterate through memory to find available spaces
+    for (let i = 0; i < memory.length; i++) {
+      if (memory[i] === null) {
+        currentBlockSize++; // Increase the size of the current free space
+        if (currentBlockSize >= process.memorySize) { // If current free space is large enough
+          if (currentBlockSize < bestFitSize) { // Check if it's the best fit so far
+            bestFitIndex = i - currentBlockSize + 1; // Update best fit index
+            bestFitSize = currentBlockSize; // Update best fit size
+          }
+        }
+      } else {
+        currentBlockSize = 0; // Reset the current free space size
+      }
+    }
+
+    // If a best fit block is found
+    if (bestFitIndex !== -1) {
       const newMemory = [...memory];
-      for (let i = 0; i < process.memorySize; i++) {
-        newMemory[freeSpaces[i]] = process.id;
+      for (let i = bestFitIndex; i < bestFitIndex + process.memorySize; i++) {
+        newMemory[i] = process.id; // Allocate memory for the process
       }
       setMemory(newMemory);
       process.status = 'Ready';
     } else {
-      process.status = 'Waiting';
+      process.status = 'Waiting'; // If no suitable block is found, set process status to 'Waiting'
     }
   };
 
