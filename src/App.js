@@ -1,7 +1,10 @@
+//App.js
+
 import React, { useState, useEffect, useRef } from 'react';
 import Menu from './components/Menu';
 import PCB from './components/PCB';
 import MemoryManagement from './components/MemoryManagement';
+import ControlButtons from './components/ControlButtons';
 
 const colors = [
   '#FF6633', '#FFB399', '#FF33FF', '#FFFF99', '#00B3E6', 
@@ -34,6 +37,7 @@ const App = () => {
   const [policy, setPolicy] = useState('');
   const [processes, setProcesses] = useState([]);
   const [memory, setMemory] = useState(new Array(100).fill(null)); // assuming 100 units of memory
+  const [showControls, setShowControls] = useState(false);
   const processIdRef = useRef(1);
   const arrivalTimeRef = useRef(0);
 
@@ -49,6 +53,8 @@ const App = () => {
       const executionInterval = setInterval(() => {
         runProcess();
       }, 1000); // Run the scheduler every second
+      
+      setShowControls(true); 
 
       return () => {
         clearInterval(interval);
@@ -157,13 +163,37 @@ const App = () => {
       prevMemory.map((unit) => (unit === process.id ? null : unit))
     );
   };
+  const handleAutoPlay = () => {
+    // Implement auto play functionality
+  };
+
+  const handlePause = () => {
+    // Implement pause functionality
+  };
+
+  const handleNext = () => {
+    // Implement next functionality
+  };
+
+  const handleReset = () => {
+    // Implement reset functionality
+  };
 
   return (
     <div>
       <Menu onSelectPolicy={handleSelectPolicy} />
+      {showControls && (
+        <ControlButtons 
+          onAutoPlay={handleAutoPlay} 
+          onPause={handlePause} 
+          onNext={handleNext} 
+          onReset={handleReset} 
+        />
+      )}
       {policy && <h3>Current Policy: {policy}</h3>}
       <PCB processes={processes} />
       <MemoryManagement processes={processes} memory={memory} setMemory={setMemory} />
+      
     </div>
   );
 };
