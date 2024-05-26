@@ -1,16 +1,18 @@
+//App
+
 import React, { useState, useEffect, useRef } from 'react';
 import Menu from './components/Menu';
 import MemoryManagement from './components/MemoryManagement';
 
 const colors = [
-  '#FF6633', '#FFB399', '#FF33FF', '#FFFF99', '#00B3E6', 
-  '#E6B333', '#3366E6', '#999966', '#99FF99', '#B34D4D',
-  '#80B300', '#809900', '#E6B3B3', '#6680B3', '#66991A', 
-  '#FF99E6', '#CCFF1A', '#FF1A66', '#E6331A', '#33FFCC',
-  '#66994D', '#B366CC', '#4D8000', '#B33300', '#CC80CC', 
-  '#66664D', '#991AFF', '#E666FF', '#4DB3FF', '#1AB399',
-  '#E666B3', '#33991A', '#CC9999', '#B3B31A', '#00E680', 
-  '#4D8066', '#809980', '#E6FF80', '#1AFF33', '#999933',
+  '#FFA182', '#FFB399', '#FF33FF', '#FFFF99', '#00B3E6', 
+  '#FFD876', '#3366E6', '#999966', '#99FF99', '#B34D4D',
+  '#C1E762', '#809900', '#E6B3B3', '#6680B3', '#66991A', 
+  '#FFBDEF', '#CCFF1A', '#FF1A66', '#E6331A', '#33FFCC',
+  '#A2C093', '#B366CC', '#4D8000', '#B33300', '#CC80CC', 
+  '#CECEC0', '#991AFF', '#E666FF', '#4DB3FF', '#1AB399',
+  '#FF51BA', '#33991A', '#CC9999', '#B3B31A', '#00E680', 
+  '#3DC982', '#809980', '#E6FF80', '#1AFF33', '#999933',
   '#FF3380', '#CCCC00', '#66E64D', '#4D80CC', '#9900B3', 
   '#E64D66', '#4DB380', '#FF4D4D', '#99E6E6', '#6666FF'
 ];
@@ -19,8 +21,8 @@ const generateProcess = (id, currentTime) => {
   return {
     id,
     burstTime: Math.min(Math.floor(Math.random() * 20) + 1, 20),
-    memorySize: Math.floor(Math.random() * 20) + 1,
-    arrivalTime: currentTime + Math.floor(Math.random() * 5) + 1, // Relative to current time
+    memorySize: Math.floor(Math.random() * (300 - 100 + 1)) + 100, // Adjusted for range 100 to 300
+    arrivalTime: currentTime, // Arrival time is set to the current timer value
     priority: Math.floor(Math.random() * 10) + 1,
     status: 'New',
     color: colors[id % colors.length],
@@ -28,43 +30,42 @@ const generateProcess = (id, currentTime) => {
   };
 };
 
+
 const App = () => {
   const [policy, setPolicy] = useState('');
   const [isPlaying, setIsPlaying] = useState(false); // New state for play/pause
   const [processes, setProcesses] = useState([]);
   const [memory, setMemory] = useState(new Array(100).fill(null));
+  
   const [jobQueue, setJobQueue] = useState([]);
   const [key, setKey] = useState(0); // Add a key state
+  const [timer, setTimer] = useState(0); // Timer state
   const processIdRef = useRef(1);
   const currentTimeRef = useRef(0); // Reference to keep track of current time
   const nextArrivalTimeRef = useRef(0); // Reference to the next arrival time
-  const timerRef = useRef(null); // Reference to the timer interval
+  const timerIntervalRef = useRef(null); // Reference to the timer interval
 
   useEffect(() => {
-    if (policy && isPlaying) { // Check if policy is selected and simulation is playing
-      const interval = setInterval(() => {
-        const newProcess = generateProcess(processIdRef.current, currentTimeRef.current);
-        processIdRef.current += 1;
-        setProcesses((prevProcesses) => [...prevProcesses, newProcess]);
-  
-        // Update the next arrival time
-        nextArrivalTimeRef.current = newProcess.arrivalTime;
-      }, 500); // Generate new process every 5 seconds instead of every second
-  
-      const executionInterval = setInterval(() => {
-        runProcess();
-        // Increment the current time
+    if (policy && isPlaying) {
+      timerIntervalRef.current = setInterval(() => {
+        // Increment the timer
+        setTimer(prevTimer => prevTimer + 1);
         currentTimeRef.current += 1;
+
+        // Check if it's time to generate a new process
+        if (currentTimeRef.current >= nextArrivalTimeRef.current) {
+          const newProcess = generateProcess(processIdRef.current, currentTimeRef.current);
+          processIdRef.current += 1;
+          setProcesses(prevProcesses => [...prevProcesses, newProcess]);
+          nextArrivalTimeRef.current = currentTimeRef.current + Math.floor(Math.random() * 5) + 1; // Set the next arrival time
+        }
+
+        runProcess();
       }, 1000); // Run the scheduler every second
-  
-      return () => {
-        clearInterval(interval);
-        clearInterval(executionInterval);
-      };
+
+      return () => clearInterval(timerIntervalRef.current);
     }
-  }, [policy, isPlaying]); // Update effect when policy or isPlaying state changes
-  
-  
+  }, [policy, isPlaying]);
 
   const handleSelectPolicy = (selectedPolicy) => {
     setPolicy(selectedPolicy);
@@ -73,9 +74,10 @@ const App = () => {
     setMemory(new Array(100).fill(null));
     setJobQueue([]);
     processIdRef.current = 1;
-    currentTimeRef.current = 0; // Reset current time when a new policy is selected
-    nextArrivalTimeRef.current = 0; // Reset next arrival time when a new policy is selected
-    setKey(prevKey => prevKey + 1); // Update the key to force re-render
+    currentTimeRef.current = 0;
+    nextArrivalTimeRef.current = 0; // Reset next arrival time
+    setKey(prevKey => prevKey + 1);
+    setTimer(0); // Reset the timer
   };
 
   const runProcess = () => {
@@ -92,39 +94,41 @@ const App = () => {
             deallocateMemory(runningProcess);
           }
         } else {
-          const nextProcess = updatedProcesses.find(p => p.status === 'Ready');
+          const nextProcess = updatedProcesses.find(p => p.status === 'Ready' && p.arrivalTime <= currentTimeRef.current);
           if (nextProcess) {
             nextProcess.status = 'Running';
           }
         }
+
       } else if (policy === 'SJF') {
         // SJF Preemptive policy
         const runningProcess = updatedProcesses.find(p => p.status === 'Running');
-        const readyProcesses = updatedProcesses.filter(p => p.status === 'Ready');
+        const readyProcesses = updatedProcesses.filter(p => p.status === 'Ready' && p.arrivalTime <= currentTimeRef.current);
 
         if (runningProcess) {
-            runningProcess.burstTime -= 1;
-            if (runningProcess.burstTime <= 0) {
-                runningProcess.status = 'Terminated';
-                deallocateMemory(runningProcess);
-            }
+          runningProcess.burstTime -= 1;
+          if (runningProcess.burstTime <= 0) {
+            runningProcess.status = 'Terminated';
+            deallocateMemory(runningProcess);
+          }
         }
 
         if (readyProcesses.length > 0) {
-            const shortestJob = readyProcesses.sort((a, b) => a.burstTime - b.burstTime)[0];
-            if (runningProcess) {
-                if (shortestJob.burstTime < runningProcess.burstTime) {
-                    runningProcess.status = 'Ready';
-                    shortestJob.status = 'Running';
-                }
-            } else {
-                shortestJob.status = 'Running';
+          const shortestJob = readyProcesses.sort((a, b) => a.burstTime - b.burstTime)[0];
+          if (runningProcess) {
+            if (shortestJob.burstTime < runningProcess.burstTime) {
+              runningProcess.status = 'Ready';
+              shortestJob.status = 'Running';
             }
+          } else {
+            shortestJob.status = 'Running';
+          }
         }
-    } else if (policy === 'Priority') {
+
+      } else if (policy === 'Priority') {
         // Priority Preemptive policy
         const runningProcess = updatedProcesses.find(p => p.status === 'Running');
-        const readyProcesses = updatedProcesses.filter(p => p.status === 'Ready');
+        const readyProcesses = updatedProcesses.filter(p => p.status === 'Ready' && p.arrivalTime <= currentTimeRef.current);
         if (runningProcess) {
           runningProcess.burstTime -= 1;
           if (runningProcess.burstTime <= 0) {
@@ -143,14 +147,15 @@ const App = () => {
             highestPriorityProcess.status = 'Running';
           }
         }
+
       } else if (policy === 'RR') {
         const runningProcess = updatedProcesses.find(p => p.status === 'Running');
-        const readyProcesses = updatedProcesses.filter(p => p.status === 'Ready');
-      
+        const readyProcesses = updatedProcesses.filter(p => p.status === 'Ready' && p.arrivalTime <= currentTimeRef.current);
+
         if (runningProcess) {
           runningProcess.burstTime -= 1;
           runningProcess.quantumLeft -= 1;
-      
+
           if (runningProcess.burstTime <= 0) {
             runningProcess.status = 'Terminated';
             deallocateMemory(runningProcess);
@@ -159,12 +164,11 @@ const App = () => {
             readyProcesses.push(runningProcess); // Push the preempted process back to the queue
           }
         }
-      
+
         if (!runningProcess && readyProcesses.length > 0) {
           const nextProcess = readyProcesses.shift(); // Get the first process from the queue
           nextProcess.status = 'Running';
           nextProcess.quantumLeft = 2; // Reset the quantum for the new running process
-          readyProcesses.push(nextProcess); // Push it to the end of the queue
         } else if (runningProcess && runningProcess.burstTime > 0 && runningProcess.quantumLeft <= 0) {
           const nextProcess = readyProcesses.shift(); // Get the first process from the queue
           if (nextProcess) {
@@ -172,17 +176,9 @@ const App = () => {
             readyProcesses.push(runningProcess); // Push the preempted process back to the queue
             nextProcess.status = 'Running';
             nextProcess.quantumLeft = 2; // Reset the quantum for the new running process
-            readyProcesses.push(nextProcess); // Push it to the end of the queue
           }
         }
       }
-      
-      
-      
-      
-      
-      
-      
 
       // Check if there are processes in the job queue that can be allocated memory
       const updatedJobQueue = [];
@@ -227,22 +223,52 @@ const App = () => {
     });
   };
 
-  const deallocateMemory = (process) => {
-    setMemory((prevMemory) =>
-      prevMemory.map((unit) => (unit === process.id ? null : unit))
-    );
-  };
+  
 
   const handlePlayPause = (play) => {
     setIsPlaying(play);
+    if (!play && timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
   };
 
   const handleNext = () => {
-    
+    // Run one step of the simulation
+    setTimer((prevTimer) => prevTimer + 1);
+    currentTimeRef.current += 1;
+  
+    // Check if it's time to generate a new process
+    if (currentTimeRef.current >= nextArrivalTimeRef.current) {
+      const newProcess = generateProcess(processIdRef.current, currentTimeRef.current);
+      processIdRef.current += 1;
+      setProcesses((prevProcesses) => [...prevProcesses, newProcess]);
+      nextArrivalTimeRef.current = currentTimeRef.current + Math.floor(Math.random() * 5) + 1; // Set the next arrival time
+    }
+  
+    runProcess();
+  };
+  
+  const deallocateMemory = (process) => {
+    setMemory((prevMemory) => {
+      const newMemory = prevMemory.map((unit) => (unit === process.id ? null : unit));
+      setMemory(newMemory); // Update parent component's memory state
+      return newMemory;
+    });
   };
 
+  const handleDelete = () => {
+    setProcesses((prevProcesses) => {
+      const updatedProcesses = [...prevProcesses];
+      const deletedProcess = updatedProcesses.pop(); // Remove the last process
+      if (deletedProcess) {
+        deallocateMemory(deletedProcess); // Deallocate memory for the deleted process
+      }
+      return updatedProcesses;
+    });
+  };
+
+
   const handleReset = () => {
-    // setPolicy('');
     setIsPlaying(false);
     setProcesses([]);
     setMemory(new Array(100).fill(null));
@@ -251,12 +277,18 @@ const App = () => {
     currentTimeRef.current = 0;
     nextArrivalTimeRef.current = 0;
     setKey(prevKey => prevKey + 1);
+    setTimer(0);
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
   };
 
   return (
     <div>
-      <Menu onSelectPolicy={handleSelectPolicy} onPlayPause={handlePlayPause} onNext={handleNext} onReset={handleReset} isPlaying={isPlaying} />
+      <Menu onSelectPolicy={handleSelectPolicy} onPlayPause={handlePlayPause} onNext={handleNext} onReset={handleReset} onDelete={handleDelete} isPlaying={isPlaying} />
+      <div>CPU Time: {timer}s</div>
       {policy && <h3>Current Policy: {policy}</h3>}
+
       <MemoryManagement
         key={key}
         processes={processes}
@@ -267,6 +299,10 @@ const App = () => {
       />
     </div>
   );
+
+  
+    
+
 };
 
 export default App;

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const Menu = ({ onSelectPolicy, onPlayPause, onNext, onReset, isPlaying }) => {
+const Menu = ({ onSelectPolicy, onPlayPause, onNext, onReset, isPlaying, onDelete }) => {
   const handlePlayPause = () => {
     onPlayPause(!isPlaying);
   };
@@ -18,6 +18,7 @@ const Menu = ({ onSelectPolicy, onPlayPause, onNext, onReset, isPlaying }) => {
         <button onClick={handlePlayPause}>Play</button>
       )}
       <button onClick={onNext}>Next</button>
+      <button onClick={onDelete}>Delete</button> {/* Call the onReset function when the Reset button is clicked */}
       <button onClick={onReset}>Reset</button> {/* Call the onReset function when the Reset button is clicked */}
     </div>
   );
