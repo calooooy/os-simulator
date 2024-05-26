@@ -20,7 +20,7 @@ const generateProcess = (id, currentTime) => {
     id,
     burstTime: Math.min(Math.floor(Math.random() * 20) + 1, 20),
     memorySize: Math.floor(Math.random() * 20) + 1,
-    arrivalTime: currentTime + Math.floor(Math.random() * 5) + 1, // Relative to current time
+    arrivalTime: currentTime, // Arrival time is set to the current timer value
     priority: Math.floor(Math.random() * 10) + 1,
     status: 'New',
     color: colors[id % colors.length],
@@ -35,36 +35,33 @@ const App = () => {
   const [memory, setMemory] = useState(new Array(100).fill(null));
   const [jobQueue, setJobQueue] = useState([]);
   const [key, setKey] = useState(0); // Add a key state
+  const [timer, setTimer] = useState(0); // Timer state
   const processIdRef = useRef(1);
   const currentTimeRef = useRef(0); // Reference to keep track of current time
   const nextArrivalTimeRef = useRef(0); // Reference to the next arrival time
-  const timerRef = useRef(null); // Reference to the timer interval
+  const timerIntervalRef = useRef(null); // Reference to the timer interval
 
   useEffect(() => {
-    if (policy && isPlaying) { // Check if policy is selected and simulation is playing
-      const interval = setInterval(() => {
-        const newProcess = generateProcess(processIdRef.current, currentTimeRef.current);
-        processIdRef.current += 1;
-        setProcesses((prevProcesses) => [...prevProcesses, newProcess]);
-  
-        // Update the next arrival time
-        nextArrivalTimeRef.current = newProcess.arrivalTime;
-      }, 500); // Generate new process every 5 seconds instead of every second
-  
-      const executionInterval = setInterval(() => {
-        runProcess();
-        // Increment the current time
+    if (policy && isPlaying) {
+      timerIntervalRef.current = setInterval(() => {
+        // Increment the timer
+        setTimer(prevTimer => prevTimer + 1);
         currentTimeRef.current += 1;
+
+        // Check if it's time to generate a new process
+        if (currentTimeRef.current >= nextArrivalTimeRef.current) {
+          const newProcess = generateProcess(processIdRef.current, currentTimeRef.current);
+          processIdRef.current += 1;
+          setProcesses(prevProcesses => [...prevProcesses, newProcess]);
+          nextArrivalTimeRef.current = currentTimeRef.current + Math.floor(Math.random() * 5) + 1; // Set the next arrival time
+        }
+
+        runProcess();
       }, 1000); // Run the scheduler every second
-  
-      return () => {
-        clearInterval(interval);
-        clearInterval(executionInterval);
-      };
+
+      return () => clearInterval(timerIntervalRef.current);
     }
-  }, [policy, isPlaying]); // Update effect when policy or isPlaying state changes
-  
-  
+  }, [policy, isPlaying]);
 
   const handleSelectPolicy = (selectedPolicy) => {
     setPolicy(selectedPolicy);
@@ -73,9 +70,10 @@ const App = () => {
     setMemory(new Array(100).fill(null));
     setJobQueue([]);
     processIdRef.current = 1;
-    currentTimeRef.current = 0; // Reset current time when a new policy is selected
-    nextArrivalTimeRef.current = 0; // Reset next arrival time when a new policy is selected
-    setKey(prevKey => prevKey + 1); // Update the key to force re-render
+    currentTimeRef.current = 0;
+    nextArrivalTimeRef.current = 0; // Reset next arrival time
+    setKey(prevKey => prevKey + 1);
+    setTimer(0); // Reset the timer
   };
 
   const runProcess = () => {
@@ -92,7 +90,7 @@ const App = () => {
             deallocateMemory(runningProcess);
           }
         } else {
-          const nextProcess = updatedProcesses.find(p => p.status === 'Ready');
+          const nextProcess = updatedProcesses.find(p => p.status === 'Ready' && p.arrivalTime <= currentTimeRef.current);
           if (nextProcess) {
             nextProcess.status = 'Running';
           }
@@ -100,31 +98,31 @@ const App = () => {
       } else if (policy === 'SJF') {
         // SJF Preemptive policy
         const runningProcess = updatedProcesses.find(p => p.status === 'Running');
-        const readyProcesses = updatedProcesses.filter(p => p.status === 'Ready');
+        const readyProcesses = updatedProcesses.filter(p => p.status === 'Ready' && p.arrivalTime <= currentTimeRef.current);
 
         if (runningProcess) {
-            runningProcess.burstTime -= 1;
-            if (runningProcess.burstTime <= 0) {
-                runningProcess.status = 'Terminated';
-                deallocateMemory(runningProcess);
-            }
+          runningProcess.burstTime -= 1;
+          if (runningProcess.burstTime <= 0) {
+            runningProcess.status = 'Terminated';
+            deallocateMemory(runningProcess);
+          }
         }
 
         if (readyProcesses.length > 0) {
-            const shortestJob = readyProcesses.sort((a, b) => a.burstTime - b.burstTime)[0];
-            if (runningProcess) {
-                if (shortestJob.burstTime < runningProcess.burstTime) {
-                    runningProcess.status = 'Ready';
-                    shortestJob.status = 'Running';
-                }
-            } else {
-                shortestJob.status = 'Running';
+          const shortestJob = readyProcesses.sort((a, b) => a.burstTime - b.burstTime)[0];
+          if (runningProcess) {
+            if (shortestJob.burstTime < runningProcess.burstTime) {
+              runningProcess.status = 'Ready';
+              shortestJob.status = 'Running';
             }
+          } else {
+            shortestJob.status = 'Running';
+          }
         }
-    } else if (policy === 'Priority') {
+      } else if (policy === 'Priority') {
         // Priority Preemptive policy
         const runningProcess = updatedProcesses.find(p => p.status === 'Running');
-        const readyProcesses = updatedProcesses.filter(p => p.status === 'Ready');
+        const readyProcesses = updatedProcesses.filter(p => p.status === 'Ready' && p.arrivalTime <= currentTimeRef.current);
         if (runningProcess) {
           runningProcess.burstTime -= 1;
           if (runningProcess.burstTime <= 0) {
@@ -145,12 +143,12 @@ const App = () => {
         }
       } else if (policy === 'RR') {
         const runningProcess = updatedProcesses.find(p => p.status === 'Running');
-        const readyProcesses = updatedProcesses.filter(p => p.status === 'Ready');
-      
+        const readyProcesses = updatedProcesses.filter(p => p.status === 'Ready' && p.arrivalTime <= currentTimeRef.current);
+
         if (runningProcess) {
           runningProcess.burstTime -= 1;
           runningProcess.quantumLeft -= 1;
-      
+
           if (runningProcess.burstTime <= 0) {
             runningProcess.status = 'Terminated';
             deallocateMemory(runningProcess);
@@ -159,12 +157,11 @@ const App = () => {
             readyProcesses.push(runningProcess); // Push the preempted process back to the queue
           }
         }
-      
+
         if (!runningProcess && readyProcesses.length > 0) {
           const nextProcess = readyProcesses.shift(); // Get the first process from the queue
           nextProcess.status = 'Running';
           nextProcess.quantumLeft = 2; // Reset the quantum for the new running process
-          readyProcesses.push(nextProcess); // Push it to the end of the queue
         } else if (runningProcess && runningProcess.burstTime > 0 && runningProcess.quantumLeft <= 0) {
           const nextProcess = readyProcesses.shift(); // Get the first process from the queue
           if (nextProcess) {
@@ -172,17 +169,9 @@ const App = () => {
             readyProcesses.push(runningProcess); // Push the preempted process back to the queue
             nextProcess.status = 'Running';
             nextProcess.quantumLeft = 2; // Reset the quantum for the new running process
-            readyProcesses.push(nextProcess); // Push it to the end of the queue
           }
         }
       }
-      
-      
-      
-      
-      
-      
-      
 
       // Check if there are processes in the job queue that can be allocated memory
       const updatedJobQueue = [];
@@ -235,14 +224,31 @@ const App = () => {
 
   const handlePlayPause = (play) => {
     setIsPlaying(play);
+    if (!play && timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
   };
 
   const handleNext = () => {
-    
+    if (!isPlaying) {
+      // Run one step of the simulation
+      setTimer(prevTimer => prevTimer + 1);
+      currentTimeRef.current += 1;
+  
+      // Check if it's time to generate a new process
+      if (currentTimeRef.current >= nextArrivalTimeRef.current) {
+        const newProcess = generateProcess(processIdRef.current, currentTimeRef.current);
+        processIdRef.current += 1;
+        setProcesses(prevProcesses => [...prevProcesses, newProcess]);
+        nextArrivalTimeRef.current = currentTimeRef.current + Math.floor(Math.random() * 5) + 1; // Set the next arrival time
+      }
+  
+      runProcess();
+    }
   };
+  
 
   const handleReset = () => {
-    // setPolicy('');
     setIsPlaying(false);
     setProcesses([]);
     setMemory(new Array(100).fill(null));
@@ -251,12 +257,16 @@ const App = () => {
     currentTimeRef.current = 0;
     nextArrivalTimeRef.current = 0;
     setKey(prevKey => prevKey + 1);
+    setTimer(0);
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
   };
 
   return (
     <div>
       <Menu onSelectPolicy={handleSelectPolicy} onPlayPause={handlePlayPause} onNext={handleNext} onReset={handleReset} isPlaying={isPlaying} />
-      {policy && <h3>Current Policy: {policy}</h3>}
+      <div>CPU Time: {timer}s</div>
       <MemoryManagement
         key={key}
         processes={processes}

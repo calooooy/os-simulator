@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
-const MemoryManagement = ({ processes, memory, setMemory, jobQueue, setJobQueue }) => {
+const MemoryManagement = ({ processes, setMemory, jobQueue, setJobQueue }) => {
+  const [memory, setMemoryState] = useState(Array(30).fill(null)); // Initialize memory with 50 slots
   const [jobQueueTableData, setJobQueueTableData] = useState([]);
   const maxJobsBeforeScroll = 15;
 
@@ -23,7 +24,6 @@ const MemoryManagement = ({ processes, memory, setMemory, jobQueue, setJobQueue 
   }, [processes]);
 
   const allocateMemory = (process, updatedJobQueueTableData) => {
-    const freeSpaces = [];
     let currentBlockSize = 0;
     let bestFitIndex = -1;
     let bestFitSize = Infinity;
@@ -47,7 +47,8 @@ const MemoryManagement = ({ processes, memory, setMemory, jobQueue, setJobQueue 
       for (let i = bestFitIndex; i < bestFitIndex + process.memorySize; i++) {
         newMemory[i] = process.id;
       }
-      setMemory(newMemory);
+      setMemoryState(newMemory);
+      setMemory(newMemory); // Update parent component's memory state
       process.status = 'Ready';
     } else {
       process.status = 'Waiting';
@@ -56,9 +57,11 @@ const MemoryManagement = ({ processes, memory, setMemory, jobQueue, setJobQueue 
   };
 
   const deallocateMemory = (process) => {
-    setMemory((prevMemory) =>
-      prevMemory.map((unit) => (unit === process.id ? null : unit))
-    );
+    setMemoryState((prevMemory) => {
+      const newMemory = prevMemory.map((unit) => (unit === process.id ? null : unit));
+      setMemory(newMemory); // Update parent component's memory state
+      return newMemory;
+    });
   };
 
   const getColor = (processId) => {
@@ -70,14 +73,59 @@ const MemoryManagement = ({ processes, memory, setMemory, jobQueue, setJobQueue 
     return process.status === 'Running' ? { backgroundColor: getColor(process.id) } : {};
   };
 
+  const renderMemory = () => {
+    const memoryBlocks = [];
+    let currentBlock = null;
+
+    memory.forEach((unit, index) => {
+      if (unit !== null) {
+        if (currentBlock && currentBlock.processId === unit) {
+          currentBlock.size++;
+        } else {
+          if (currentBlock) {
+            memoryBlocks.push(currentBlock);
+          }
+          currentBlock = { processId: unit, size: 1 };
+        }
+      } else {
+        if (currentBlock) {
+          memoryBlocks.push(currentBlock);
+          currentBlock = null;
+        }
+        memoryBlocks.push({ processId: null, size: 1 });
+      }
+    });
+
+    if (currentBlock) {
+      memoryBlocks.push(currentBlock);
+    }
+
+    return memoryBlocks.map((block, index) => (
+      <div
+        key={index}
+        style={{
+          width: '100%',
+          height: `${block.size * 30}px`,
+          backgroundColor: getColor(block.processId),
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '1px',
+          marginBottom: '0px',
+        }}
+      >
+        {block.processId !== null ? `${block.processId}` : ''}
+      </div>
+    ));
+  };
+
   return (
     <div>
-      {/* <h2>Memory Management</h2> */}
-      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <div style={{ flex: 1, marginRight: '20px' }}>
+      <div style={{ flex: 1, display: 'flex' }}>
+        <div style={{ flex: 1 }}>
           <h3>PCB</h3>
-          <div style={{ overflowY: 'scroll', height: '400px' }}>
-            <table style={{ width: '100%', textAlign: 'center' }}>
+          <div style={{ overflowY: 'scroll', height: '400px', width: '80%' }}>
+            <table style={{ width: '100%', textAlign: 'center', paddingBottom: '20px' }}>
               <thead>
                 <tr>
                   <th>Process ID</th>
@@ -102,10 +150,9 @@ const MemoryManagement = ({ processes, memory, setMemory, jobQueue, setJobQueue 
               </tbody>
             </table>
           </div>
-        </div>
-        <div style={{ flex: 1 }}>
+
           <h3>Job Queue</h3>
-          <div style={{ maxHeight: jobQueueTableData.length > maxJobsBeforeScroll ? '300px' : 'auto', overflowY: 'auto' }}>
+          <div style={{ maxHeight: jobQueueTableData.length > maxJobsBeforeScroll ? '300px' : 'auto', overflowY: 'scroll', width: '80%' }}>
             <table style={{ width: '100%', textAlign: 'center' }}>
               <thead>
                 <tr>
@@ -132,26 +179,12 @@ const MemoryManagement = ({ processes, memory, setMemory, jobQueue, setJobQueue 
             </table>
           </div>
         </div>
-      </div>
-      <div>
-        <h3>Memory Allocation</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '5px' }}>
-          {memory.map((unit, index) => (
-            <div 
-              key={index} 
-              style={{ 
-                width: '30px', 
-                height: '30px', 
-                border: '1px solid black', 
-                backgroundColor: getColor(unit),
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              {unit}
-            </div>
-          ))}
+
+        <div style={{ width: '20%', height: '100%' }}>
+          <h3>Memory Allocation</h3>
+          <div style={{ border: '1px solid black', height: '100%' }}>
+            {renderMemory()}
+          </div>
         </div>
       </div>
     </div>
