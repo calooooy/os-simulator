@@ -1,3 +1,5 @@
+// App.js
+
 import React, { useState, useEffect, useRef } from 'react';
 import Menu from './components/Menu';
 import MemoryManagement from './components/MemoryManagement';
@@ -39,28 +41,37 @@ const App = () => {
   const currentTimeRef = useRef(0); // Reference to keep track of current time
   const nextArrivalTimeRef = useRef(0); // Reference to the next arrival time
   const timerRef = useRef(null); // Reference to the timer interval
+  // Timer state
+  const [timer, setTimer] = useState(0);
+  const timerIntervalRef = useRef(null);
+
 
   useEffect(() => {
-    if (policy && isPlaying) { // Check if policy is selected and simulation is playing
-      const interval = setInterval(() => {
+    if (policy && isPlaying) {
+      const processInterval = setInterval(() => {
         const newProcess = generateProcess(processIdRef.current, currentTimeRef.current);
         processIdRef.current += 1;
         setProcesses((prevProcesses) => [...prevProcesses, newProcess]);
-  
-        // Update the next arrival time
         nextArrivalTimeRef.current = newProcess.arrivalTime;
-      }, 500); // Generate new process every 5 seconds instead of every second
-  
+      }, 500);
+
       const executionInterval = setInterval(() => {
         runProcess();
-        // Increment the current time
         currentTimeRef.current += 1;
-      }, 1000); // Run the scheduler every second
-  
+      }, 1000);
+
+      // Start the timer
+      timerIntervalRef.current = setInterval(() => {
+        setTimer(prevTimer => prevTimer + 1);
+      }, 1000);
+
       return () => {
-        clearInterval(interval);
+        clearInterval(processInterval);
         clearInterval(executionInterval);
+        clearInterval(timerIntervalRef.current);
       };
+    } else {
+      clearInterval(timerIntervalRef.current);
     }
   }, [policy, isPlaying]); // Update effect when policy or isPlaying state changes
   
@@ -73,9 +84,10 @@ const App = () => {
     setMemory(new Array(100).fill(null));
     setJobQueue([]);
     processIdRef.current = 1;
-    currentTimeRef.current = 0; // Reset current time when a new policy is selected
-    nextArrivalTimeRef.current = 0; // Reset next arrival time when a new policy is selected
-    setKey(prevKey => prevKey + 1); // Update the key to force re-render
+    currentTimeRef.current = 0;
+    nextArrivalTimeRef.current = 0;
+    setKey(prevKey => prevKey + 1);
+    setTimer(0); //// Update the key to force re-render
   };
 
   const runProcess = () => {
@@ -242,7 +254,6 @@ const App = () => {
   };
 
   const handleReset = () => {
-    // setPolicy('');
     setIsPlaying(false);
     setProcesses([]);
     setMemory(new Array(100).fill(null));
@@ -251,12 +262,14 @@ const App = () => {
     currentTimeRef.current = 0;
     nextArrivalTimeRef.current = 0;
     setKey(prevKey => prevKey + 1);
+    setTimer(0); // Reset timer on reset
   };
 
   return (
     <div>
       <Menu onSelectPolicy={handleSelectPolicy} onPlayPause={handlePlayPause} onNext={handleNext} onReset={handleReset} isPlaying={isPlaying} />
       {policy && <h3>Current Policy: {policy}</h3>}
+      <div>Elapsed Time: {timer}s</div> {/* Display the timer */}
       <MemoryManagement
         key={key}
         processes={processes}
