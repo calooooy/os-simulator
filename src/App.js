@@ -284,9 +284,16 @@ const App = () => {
     }
   };
 
+  const handleAddProcess = () => {
+    const newProcess = generateProcess(processIdRef.current, currentTimeRef.current);
+    processIdRef.current += 1;
+    setProcesses(prevProcesses => [...prevProcesses, newProcess]);
+  };
+  
+
   return (
     <div>
-      <Menu onSelectPolicy={handleSelectPolicy} onPlayPause={handlePlayPause} onNext={handleNext} onReset={handleReset} onDelete={handleDelete} isPlaying={isPlaying} />
+      <Menu onSelectPolicy={handleSelectPolicy} onPlayPause={handlePlayPause} onNext={handleNext} onReset={handleReset} onDelete={handleDelete} onAddProcess={handleAddProcess} isPlaying={isPlaying} />
       <div>CPU Time: {timer}s</div>
       {policy && <h3>Current Policy: {policy}</h3>}
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const Menu = ({ onSelectPolicy, onPlayPause, onNext, onReset, isPlaying, onDelete }) => {
+const Menu = ({ onSelectPolicy, onPlayPause, onNext, onReset, onAddProcess, isPlaying, onDelete }) => {
   const handlePlayPause = () => {
     onPlayPause(!isPlaying);
   };
@@ -12,6 +12,7 @@ const Menu = ({ onSelectPolicy, onPlayPause, onNext, onReset, isPlaying, onDelet
       <button onClick={() => onSelectPolicy('SJF')}>SJF</button>
       <button onClick={() => onSelectPolicy('Priority')}>Priority</button>
       <button onClick={() => onSelectPolicy('RR')}>Round Robin</button>
+      <button onClick={onAddProcess}>Add</button>
       {isPlaying ? (
         <button onClick={handlePlayPause}>Pause</button>
       ) : (
