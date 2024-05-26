@@ -73,8 +73,9 @@ const MemoryManagement = ({ processes, setMemory, jobQueue, setJobQueue }) => {
         pcbProcess.status = 'Ready';
       }
 
-      updatedJobQueueTableData.splice(minIdProcessIndex, 1); // Remove from job queue since it's allocated memory
-      setJobQueueTableData(updatedJobQueueTableData);
+      // Remove from job queue since it's allocated memory
+      updatedJobQueueTableData.splice(minIdProcessIndex, 1);
+      setJobQueueTableData([...updatedJobQueueTableData]); // Update job queue state
       return true; // Indicate that a waiting process has been allocated
     }
 
@@ -82,10 +83,10 @@ const MemoryManagement = ({ processes, setMemory, jobQueue, setJobQueue }) => {
   };
 
   // Try to allocate memory for the process with the minimum Process ID from the job queue first
-  allocateMinIdProcessFromJobQueue();
+  if (allocateMinIdProcessFromJobQueue()) return;
 
   // If there's enough memory, allocate to the new process if possible
-  if (!allocateMinIdProcessFromJobQueue() && memory.some(unit => unit === null)) {
+  if (memory.some(unit => unit === null)) {
     currentBlockSize = 0;
     bestFitIndex = -1;
     for (let i = 0; i < memory.length; i++) {
@@ -112,84 +113,66 @@ const MemoryManagement = ({ processes, setMemory, jobQueue, setJobQueue }) => {
       // If the new process cannot be allocated, add it to the job queue
       updatedJobQueueTableData.push(process);
       process.status = 'Waiting';
-      setJobQueueTableData(updatedJobQueueTableData);
+      setJobQueueTableData([...updatedJobQueueTableData]); // Update job queue state
     }
   }
 };
 
-  
-  const deallocateMemory = (process) => {
-    // Deallocate memory allocated to the terminated process
-    setMemoryState((prevMemory) => {
-      const newMemory = prevMemory.map((unit) => (unit === process.id ? null : unit));
-      setMemory(newMemory); // Update parent component's memory state
-      return newMemory;
+const deallocateMemory = (process) => {
+  // Deallocate memory allocated to the terminated process
+  setMemoryState(prevMemory => {
+    const newMemory = prevMemory.map(unit => (unit === process.id ? null : unit));
+    setMemory(newMemory); // Update parent component's memory state
+    return newMemory;
+  });
+
+  // Find the process with the minimum Process ID in the job queue
+  if (jobQueueTableData.length > 0) {
+    const minIdProcess = jobQueueTableData.reduce((minProcess, currentProcess) => {
+      return currentProcess.id < minProcess.id ? currentProcess : minProcess;
     });
-  
-    // Allocate memory for waiting processes if any
-    const updatedJobQueueTableData = [...jobQueueTableData];
-  
-    const allocateMinIdProcessFromJobQueue = () => {
-      if (updatedJobQueueTableData.length === 0) return false;
-  
-      // Find the process with the minimum Process ID
-      let minIdProcessIndex = -1;
-      let minProcessId = Infinity;
-      for (let i = 0; i < updatedJobQueueTableData.length; i++) {
-        if (updatedJobQueueTableData[i].status === 'Waiting' && updatedJobQueueTableData[i].id < minProcessId) {
-          minProcessId = updatedJobQueueTableData[i].id;
-          minIdProcessIndex = i;
+
+    // If no waiting processes, return
+    if (!minIdProcess) return;
+
+    // Try to allocate memory for the process with the minimum Process ID from the job queue
+    let currentBlockSize = 0;
+    let bestFitIndex = -1;
+
+    for (let j = 0; j < memory.length; j++) {
+      if (memory[j] === null) {
+        currentBlockSize++;
+        if (currentBlockSize >= minIdProcess.memorySize) {
+          bestFitIndex = j - currentBlockSize + 1;
+          break;
         }
+      } else {
+        currentBlockSize = 0;
       }
-  
-      if (minIdProcessIndex === -1) return false;
-  
-      const minIdProcess = updatedJobQueueTableData[minIdProcessIndex];
-      let currentBlockSize = 0;
-      let bestFitIndex = -1;
-  
-      for (let j = 0; j < memory.length; j++) {
-        if (memory[j] === null) {
-          currentBlockSize++;
-          if (currentBlockSize >= minIdProcess.memorySize) {
-            bestFitIndex = j - currentBlockSize + 1;
-            break;
-          }
-        } else {
-          currentBlockSize = 0;
-        }
+    }
+
+    if (bestFitIndex !== -1) {
+      const newMemory = [...memory];
+      for (let k = bestFitIndex; k < bestFitIndex + minIdProcess.memorySize; k++) {
+        newMemory[k] = minIdProcess.id;
       }
-  
-      if (bestFitIndex !== -1) {
-        const newMemory = [...memory];
-        for (let k = bestFitIndex; k < bestFitIndex + minIdProcess.memorySize; k++) {
-          newMemory[k] = minIdProcess.id;
-        }
-        setMemoryState(newMemory);
-        setMemory(newMemory); // Update parent component's memory state
-        minIdProcess.status = 'Ready';
-  
-        // Update the process status in the processes array
-        const pcbProcess = processes.find(p => p.id === minIdProcess.id);
-        if (pcbProcess) {
-          pcbProcess.status = 'Ready';
-        }
-  
-        updatedJobQueueTableData.splice(minIdProcessIndex, 1); // Remove from job queue since it's allocated memory
-        setJobQueueTableData(updatedJobQueueTableData);
-        return true; // Indicate that a waiting process has been allocated
+      setMemoryState(newMemory);
+      setMemory(newMemory); // Update parent component's memory state
+      minIdProcess.status = 'Ready';
+
+      // Update the process status in the processes array
+      const pcbProcess = processes.find(p => p.id === minIdProcess.id);
+      if (pcbProcess) {
+        pcbProcess.status = 'Ready';
       }
-  
-      return false; // No waiting process could be allocated
-    };
-  
-    // Try to allocate memory for the process with the minimum Process ID from the job queue first
-    allocateMinIdProcessFromJobQueue();
-  };
-  
-  
-  
-  
+
+      // Remove the allocated process from the job queue
+      const updatedJobQueueTableData = jobQueueTableData.filter(p => p.id !== minIdProcess.id);
+      setJobQueueTableData([...updatedJobQueueTableData]); // Update job queue state
+    }
+  }
+};
+
 
   const getColor = (processId) => {
     const process = processes.find(p => p.id === processId);
@@ -244,84 +227,79 @@ const MemoryManagement = ({ processes, setMemory, jobQueue, setJobQueue }) => {
     ));
   };
 
-
   return (
     <div style={{ display: 'flex', width: '100%' }}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center'  }}>
-      <div>
-  <h3>PCB</h3>
-  <div style={{ overflowY: 'scroll', height: '250px', width: '1000px' }}>
-    <table style={{ width: '100%', textAlign: 'center', paddingBottom: '20px', color: 'black', border: '1px solid #000', borderCollapse: 'collapse', backgroundColor: 'white' }}>
-    <thead style={{ position: 'sticky', top: '0', backgroundColor: '#fff089', height: '50px', zIndex: '1' }}>
-        <tr>
-          <th style={{ border: '1px solid #000' }}>Process ID</th>
-          <th style={{ border: '1px solid #000' }}>Burst Time</th>
-          <th style={{ border: '1px solid #000' }}>Memory Size</th>
-          <th style={{ border: '1px solid #000' }}>Arrival Time</th>
-          {processes.some(p => p.priority !== undefined) && <th style={{ border: '1px solid #000' }}>Priority</th>}
-          <th style={{ border: '1px solid #000' }}>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {processes.map((process, index) => (
-          <tr key={index} style={{ ...getRowStyle(process), height: '30px' }}>
-            <td style={{ border: '1px solid #000' }}>{process.id}</td>
-            <td style={{ border: '1px solid #000' }}>{process.burstTime}</td>
-            <td style={{ border: '1px solid #000' }}>{process.memorySize}</td>
-            <td style={{ border: '1px solid #000' }}>{process.arrivalTime}</td>
-            {process.priority !== undefined && <td style={{ border: '1px solid #000' }}>{process.priority}</td>}
-            <td style={{ border: '1px solid #000' }}>{process.status}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-</div>
+        <div>
+          <h3>PCB</h3>
+          <div style={{ overflowY: 'scroll', height: '250px', width: '1000px' }}>
+            <table style={{ width: '100%', textAlign: 'center', paddingBottom: '20px', color: 'black', border: '1px solid #000', borderCollapse: 'collapse', backgroundColor: 'white' }}>
+              <thead style={{ position: 'sticky', top: '0', backgroundColor: '#fff089', height: '50px', zIndex: '1' }}>
+                <tr>
+                  <th style={{ border: '1px solid #000' }}>Process ID</th>
+                  <th style={{ border: '1px solid #000' }}>Burst Time</th>
+                  <th style={{ border: '1px solid #000' }}>Memory Size</th>
+                  <th style={{ border: '1px solid #000' }}>Arrival Time</th>
+                  {processes.some(p => p.priority !== undefined) && <th style={{ border: '1px solid #000' }}>Priority</th>}
+                  <th style={{ border: '1px solid #000' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {processes.map((process, index) => (
+                  <tr key={index} style={{ ...getRowStyle(process), height: '30px' }}>
+                    <td style={{ border: '1px solid #000' }}>{process.id}</td>
+                    <td style={{ border: '1px solid #000' }}>{process.burstTime}</td>
+                    <td style={{ border: '1px solid #000' }}>{process.memorySize}</td>
+                    <td style={{ border: '1px solid #000' }}>{process.arrivalTime}</td>
+                    {process.priority !== undefined && <td style={{ border: '1px solid #000' }}>{process.priority}</td>}
+                    <td style={{ border: '1px solid #000' }}>{process.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
+        <div>
+          <h3>Job Queue</h3>
+          <div style={{ maxHeight: jobQueueTableData.length > maxJobsBeforeScroll ? '300px' : 'auto', overflowY: 'scroll', width: '1000px', height: '250px' }}>
+            <table style={{ width: '100%', textAlign: 'center', border: '1px solid #000', borderCollapse: 'collapse', backgroundColor: 'white' }}>
+              <thead style={{ position: 'sticky', top: 0, backgroundColor: '#fff089', height: '50px' }}>
+                <tr>
+                  <th style={{ border: '1px solid #000' }}>Process ID</th>
+                  <th style={{ border: '1px solid #000' }}>Burst Time</th>
+                  <th style={{ border: '1px solid #000' }}>Memory Size</th>
+                  <th style={{ border: '1px solid #000' }}>Arrival Time</th>
+                  <th style={{ border: '1px solid #000' }}>Priority</th>
+                  <th style={{ border: '1px solid #000' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jobQueueTableData.map((process) => (
+                  <tr key={process.id} style={{ height: '30px' }}>
+                    <td style={{ border: '1px solid #000' }}>{process.id}</td>
+                    <td style={{ border: '1px solid #000' }}>{process.burstTime}</td>
+                    <td style={{ border: '1px solid #000' }}>{process.memorySize}</td>
+                    <td style={{ border: '1px solid #000' }}>{process.arrivalTime}</td>
+                    <td style={{ border: '1px solid #000' }}>{process.priority}</td>
+                    <td style={{ border: '1px solid #000' }}>{process.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
 
-<div>
-  <h3>Job Queue</h3>
-  <div style={{ maxHeight: jobQueueTableData.length > maxJobsBeforeScroll ? '300px' : 'auto', overflowY: 'scroll', width: '1000px', height: '250px' }}>
-    <table style={{ width: '100%', textAlign: 'center', border: '1px solid #000', borderCollapse: 'collapse', backgroundColor: 'white' }}>
-      <thead style={{ position: 'sticky', top: 0, backgroundColor: '#fff089', height: '50px' }}>
-        <tr>
-          <th style={{ border: '1px solid #000' }}>Process ID</th>
-          <th style={{ border: '1px solid #000' }}>Burst Time</th>
-          <th style={{ border: '1px solid #000' }}>Memory Size</th>
-          <th style={{ border: '1px solid #000' }}>Arrival Time</th>
-          <th style={{ border: '1px solid #000' }}>Priority</th>
-          <th style={{ border: '1px solid #000' }}>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {jobQueueTableData.map((process) => (
-          <tr key={process.id} style={{ height: '30px' }}>
-            <td style={{ border: '1px solid #000' }}>{process.id}</td>
-            <td style={{ border: '1px solid #000' }}>{process.burstTime}</td>
-            <td style={{ border: '1px solid #000' }}>{process.memorySize}</td>
-            <td style={{ border: '1px solid #000' }}>{process.arrivalTime}</td>
-            <td style={{ border: '1px solid #000' }}>{process.priority}</td>
-            <td style={{ border: '1px solid #000' }}>{process.status}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-</div>
-</div>
-
-<div style={{ width: '20%', marginLeft: '0px', marginRight: '40px' }}>
-  <div style={{ backgroundColor: '#fff089', border: '1px solid black', borderRadius:'10px', padding: '10px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-    <h3 style={{ margin: '10px' }}>Memory Allocation</h3>
-    <div style={{ border: '1px solid black', height: '100%', width: '80%', marginBottom: '20px' }}>
-      {renderMemory()}
+      <div style={{ width: '20%', marginLeft: '0px', marginRight: '40px' }}>
+        <div style={{ backgroundColor: '#fff089', border: '1px solid black', borderRadius:'10px', padding: '10px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+          <h3 style={{ margin: '10px' }}>Memory Allocation</h3>
+          <div style={{ border: '1px solid black', height: '100%', width: '80%', marginBottom: '20px' }}>
+            {renderMemory()}
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
-
-
-      
-</div>
   );
 };
 

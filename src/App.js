@@ -20,8 +20,8 @@ const colors = [
 const generateProcess = (id, currentTime) => {
   return {
     id,
-    burstTime: Math.min(Math.floor(Math.random() * 20) + 1, 20),
-    memorySize: Math.floor(Math.random() * (300 - 100 + 1)) + 100, // Adjusted for range 100 to 300
+    burstTime: Math.floor(Math.random() * 10) + 1, // Generates burst time between 1 and 10
+    memorySize: Math.floor(Math.random() * 31) + 80, // Generates memory size between 80 and 110
     arrivalTime: currentTime, // Arrival time is set to the current timer value
     priority: Math.floor(Math.random() * 10) + 1,
     status: 'New',
@@ -29,6 +29,7 @@ const generateProcess = (id, currentTime) => {
     quantumLeft: 0
   };
 };
+
 
 
 const App = () => {
