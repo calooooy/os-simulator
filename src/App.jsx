@@ -30,8 +30,6 @@ const generateProcess = (id, currentTime) => {
   };
 };
 
-
-
 const App = () => {
   const [policy, setPolicy] = useState('');
   const [isPlaying, setIsPlaying] = useState(false); // New state for play/pause
@@ -45,6 +43,8 @@ const App = () => {
   const currentTimeRef = useRef(0); // Reference to keep track of current time
   const nextArrivalTimeRef = useRef(0); // Reference to the next arrival time
   const timerIntervalRef = useRef(null); // Reference to the timer interval
+  const quantum = 2; // Define the time quantum for RR policy
+  const [readyQueue, setReadyQueue] = useState([]);
 
   useEffect(() => {
     if (policy && isPlaying) {
@@ -150,36 +150,40 @@ const App = () => {
         }
 
       } else if (policy === 'RR') {
-        const runningProcess = updatedProcesses.find(p => p.status === 'Running');
-        const readyProcesses = updatedProcesses.filter(p => p.status === 'Ready' && p.arrivalTime <= currentTimeRef.current);
-
-        if (runningProcess) {
-          runningProcess.burstTime -= 1;
-          runningProcess.quantumLeft -= 1;
-
-          if (runningProcess.burstTime <= 0) {
-            runningProcess.status = 'Terminated';
-            deallocateMemory(runningProcess);
-          } else if (runningProcess.quantumLeft <= 0) {
-            runningProcess.status = 'Ready';
-            readyProcesses.push(runningProcess); // Push the preempted process back to the queue
+        const currentReadyQueue = [...readyQueue];
+        
+        // Add new arriving processes to the ready queue
+        updatedProcesses.forEach(process => {
+          if (process.status === 'Ready' && process.arrivalTime <= currentTimeRef.current && !currentReadyQueue.includes(process.id)) {
+            currentReadyQueue.push(process.id);
+          }
+        });
+  
+        if (currentReadyQueue.length > 0) {
+          const runningProcessId = currentReadyQueue.shift();
+          const runningProcess = updatedProcesses.find(p => p.id === runningProcessId);
+  
+          if (runningProcess) {
+            runningProcess.status = 'Running';
+            runningProcess.burstTime -= 1;
+            runningProcess.quantumLeft = (runningProcess.quantumLeft || quantum) - 1;
+  
+            if (runningProcess.burstTime <= 0) {
+              runningProcess.status = 'Terminated';
+              deallocateMemory(runningProcess);
+            } else if (runningProcess.quantumLeft <= 0) {
+              runningProcess.status = 'Ready';
+              runningProcess.quantumLeft = quantum; // Reset quantum time
+              currentReadyQueue.push(runningProcess.id);
+            } else {
+              currentReadyQueue.unshift(runningProcess.id); // Still has quantum left, re-add to front of queue
+            }
           }
         }
-
-        if (!runningProcess && readyProcesses.length > 0) {
-          const nextProcess = readyProcesses.shift(); // Get the first process from the queue
-          nextProcess.status = 'Running';
-          nextProcess.quantumLeft = 2; // Reset the quantum for the new running process
-        } else if (runningProcess && runningProcess.burstTime > 0 && runningProcess.quantumLeft <= 0) {
-          const nextProcess = readyProcesses.shift(); // Get the first process from the queue
-          if (nextProcess) {
-            runningProcess.status = 'Ready';
-            readyProcesses.push(runningProcess); // Push the preempted process back to the queue
-            nextProcess.status = 'Running';
-            nextProcess.quantumLeft = 2; // Reset the quantum for the new running process
-          }
-        }
+  
+        setReadyQueue(currentReadyQueue);
       }
+  
 
       // Check if there are processes in the job queue that can be allocated memory
       const updatedJobQueue = [];
