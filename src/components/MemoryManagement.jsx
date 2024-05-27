@@ -10,7 +10,7 @@ const MemoryManagement = ({ processes, setMemory, jobQueue, setJobQueue }) => {
   }, [jobQueue]);
 
   useEffect(() => {
-    const updatedJobQueueTableData = [...jobQueueTableData];
+    const updatedJobQueueTableData = jobQueueTableData.filter(process => process.status === 'Waiting');
 
     processes.forEach((process) => {
       if (process.status === 'New') {
@@ -20,159 +20,142 @@ const MemoryManagement = ({ processes, setMemory, jobQueue, setJobQueue }) => {
       }
     });
 
+    // Remove terminated processes from the processes array
+    const updatedProcesses = processes.filter(process => process.status !== 'Terminated');
+    // Call any function or state update to handle the updated processes list if necessary
+
     setJobQueueTableData(updatedJobQueueTableData);
   }, [processes]);
 
   const allocateMemory = (process, updatedJobQueueTableData) => {
-  let currentBlockSize = 0;
-  let bestFitIndex = -1;
-
-  // Function to allocate memory to the process with the minimum Process ID from the job queue
-  const allocateMinIdProcessFromJobQueue = () => {
-    if (updatedJobQueueTableData.length === 0) return false;
-
-    // Find the process with the minimum Process ID
-    let minIdProcessIndex = -1;
-    let minProcessId = Infinity;
-    for (let i = 0; i < updatedJobQueueTableData.length; i++) {
-      if (updatedJobQueueTableData[i].status === 'Waiting' && updatedJobQueueTableData[i].id < minProcessId) {
-        minProcessId = updatedJobQueueTableData[i].id;
-        minIdProcessIndex = i;
-      }
-    }
-
-    if (minIdProcessIndex === -1) return false;
-
-    const minIdProcess = updatedJobQueueTableData[minIdProcessIndex];
-
-    currentBlockSize = 0;
-    bestFitIndex = -1;
-    for (let j = 0; j < memory.length; j++) {
-      if (memory[j] === null) {
-        currentBlockSize++;
-        if (currentBlockSize >= minIdProcess.memorySize) {
-          bestFitIndex = j - currentBlockSize + 1;
-          break;
-        }
-      } else {
-        currentBlockSize = 0;
-      }
-    }
-    if (bestFitIndex !== -1) {
-      const newMemory = [...memory];
-      for (let k = bestFitIndex; k < bestFitIndex + minIdProcess.memorySize; k++) {
-        newMemory[k] = minIdProcess.id;
-      }
-      setMemoryState(newMemory);
-      setMemory(newMemory); // Update parent component's memory state
-      minIdProcess.status = 'Ready';
-
-      // Update the process status in the processes array
-      const pcbProcess = processes.find(p => p.id === minIdProcess.id);
-      if (pcbProcess) {
-        pcbProcess.status = 'Ready';
-      }
-
-      // Remove from job queue since it's allocated memory
-      updatedJobQueueTableData.splice(minIdProcessIndex, 1);
-      setJobQueueTableData([...updatedJobQueueTableData]); // Update job queue state
-      return true; // Indicate that a waiting process has been allocated
-    }
-
-    return false; // No waiting process could be allocated
-  };
-
-  // Try to allocate memory for the process with the minimum Process ID from the job queue first
-  if (allocateMinIdProcessFromJobQueue()) return;
-
-  // If there's enough memory, allocate to the new process if possible
-  if (memory.some(unit => unit === null)) {
-    currentBlockSize = 0;
-    bestFitIndex = -1;
-    for (let i = 0; i < memory.length; i++) {
-      if (memory[i] === null) {
-        currentBlockSize++;
-        if (currentBlockSize >= process.memorySize) {
-          bestFitIndex = i - currentBlockSize + 1;
-          break;
-        }
-      } else {
-        currentBlockSize = 0;
-      }
-    }
-
-    if (bestFitIndex !== -1) {
-      const newMemory = [...memory];
-      for (let i = bestFitIndex; i < bestFitIndex + process.memorySize; i++) {
-        newMemory[i] = process.id;
-      }
-      setMemoryState(newMemory);
-      setMemory(newMemory); // Update parent component's memory state
-      process.status = 'Ready';
-    } else {
-      // If the new process cannot be allocated, add it to the job queue
-      updatedJobQueueTableData.push(process);
-      process.status = 'Waiting';
-      setJobQueueTableData([...updatedJobQueueTableData]); // Update job queue state
-    }
-  }
-};
-
-const deallocateMemory = (process) => {
-  // Deallocate memory allocated to the terminated process
-  setMemoryState(prevMemory => {
-    const newMemory = prevMemory.map(unit => (unit === process.id ? null : unit));
-    setMemory(newMemory); // Update parent component's memory state
-    return newMemory;
-  });
-
-  // Find the process with the minimum Process ID in the job queue
-  if (jobQueueTableData.length > 0) {
-    const minIdProcess = jobQueueTableData.reduce((minProcess, currentProcess) => {
-      return currentProcess.id < minProcess.id ? currentProcess : minProcess;
-    });
-
-    // If no waiting processes, return
-    if (!minIdProcess) return;
-
-    // Try to allocate memory for the process with the minimum Process ID from the job queue
     let currentBlockSize = 0;
     let bestFitIndex = -1;
 
-    for (let j = 0; j < memory.length; j++) {
-      if (memory[j] === null) {
-        currentBlockSize++;
-        if (currentBlockSize >= minIdProcess.memorySize) {
-          bestFitIndex = j - currentBlockSize + 1;
-          break;
+    const allocateMinIdProcessFromJobQueue = () => {
+      if (updatedJobQueueTableData.length === 0) return false;
+
+      const minIdProcess = updatedJobQueueTableData.reduce((minProcess, currentProcess) => {
+        return currentProcess.id < minProcess.id ? currentProcess : minProcess;
+      });
+
+      if (!minIdProcess) return false;
+
+      currentBlockSize = 0;
+      bestFitIndex = -1;
+      for (let j = 0; j < memory.length; j++) {
+        if (memory[j] === null) {
+          currentBlockSize++;
+          if (currentBlockSize >= minIdProcess.memorySize) {
+            bestFitIndex = j - currentBlockSize + 1;
+            break;
+          }
+        } else {
+          currentBlockSize = 0;
         }
+      }
+      if (bestFitIndex !== -1) {
+        const newMemory = [...memory];
+        for (let k = bestFitIndex; k < bestFitIndex + minIdProcess.memorySize; k++) {
+          newMemory[k] = minIdProcess.id;
+        }
+        setMemoryState(newMemory);
+        setMemory(newMemory);
+        minIdProcess.status = 'Ready';
+
+        const pcbProcess = processes.find(p => p.id === minIdProcess.id);
+        if (pcbProcess) {
+          pcbProcess.status = 'Ready';
+        }
+
+        const updatedQueue = updatedJobQueueTableData.filter(p => p.id !== minIdProcess.id);
+        setJobQueueTableData(updatedQueue);
+        return true;
+      }
+
+      return false;
+    };
+
+    if (allocateMinIdProcessFromJobQueue()) return;
+
+    if (memory.some(unit => unit === null)) {
+      currentBlockSize = 0;
+      bestFitIndex = -1;
+      for (let i = 0; i < memory.length; i++) {
+        if (memory[i] === null) {
+          currentBlockSize++;
+          if (currentBlockSize >= process.memorySize) {
+            bestFitIndex = i - currentBlockSize + 1;
+            break;
+          }
+        } else {
+          currentBlockSize = 0;
+        }
+      }
+
+      if (bestFitIndex !== -1) {
+        const newMemory = [...memory];
+        for (let i = bestFitIndex; i < bestFitIndex + process.memorySize; i++) {
+          newMemory[i] = process.id;
+        }
+        setMemoryState(newMemory);
+        setMemory(newMemory);
+        process.status = 'Ready';
       } else {
-        currentBlockSize = 0;
+        updatedJobQueueTableData.push(process);
+        process.status = 'Waiting';
+        setJobQueueTableData([...updatedJobQueueTableData]);
       }
     }
+  };
 
-    if (bestFitIndex !== -1) {
-      const newMemory = [...memory];
-      for (let k = bestFitIndex; k < bestFitIndex + minIdProcess.memorySize; k++) {
-        newMemory[k] = minIdProcess.id;
+  const deallocateMemory = (process) => {
+    setMemoryState(prevMemory => {
+      const newMemory = prevMemory.map(unit => (unit === process.id ? null : unit));
+      setMemory(newMemory);
+      return newMemory;
+    });
+
+    if (jobQueueTableData.length > 0) {
+      const minIdProcess = jobQueueTableData.reduce((minProcess, currentProcess) => {
+        return currentProcess.id < minProcess.id ? currentProcess : minProcess;
+      });
+
+      if (!minIdProcess) return;
+
+      let currentBlockSize = 0;
+      let bestFitIndex = -1;
+
+      for (let j = 0; j < memory.length; j++) {
+        if (memory[j] === null) {
+          currentBlockSize++;
+          if (currentBlockSize >= minIdProcess.memorySize) {
+            bestFitIndex = j - currentBlockSize + 1;
+            break;
+          }
+        } else {
+          currentBlockSize = 0;
+        }
       }
-      setMemoryState(newMemory);
-      setMemory(newMemory); // Update parent component's memory state
-      minIdProcess.status = 'Ready';
 
-      // Update the process status in the processes array
-      const pcbProcess = processes.find(p => p.id === minIdProcess.id);
-      if (pcbProcess) {
-        pcbProcess.status = 'Ready';
+      if (bestFitIndex !== -1) {
+        const newMemory = [...memory];
+        for (let k = bestFitIndex; k < bestFitIndex + minIdProcess.memorySize; k++) {
+          newMemory[k] = minIdProcess.id;
+        }
+        setMemoryState(newMemory);
+        setMemory(newMemory);
+        minIdProcess.status = 'Ready';
+
+        const pcbProcess = processes.find(p => p.id === minIdProcess.id);
+        if (pcbProcess) {
+          pcbProcess.status = 'Ready';
+        }
+
+        const updatedQueue = jobQueueTableData.filter(p => p.id !== minIdProcess.id);
+        setJobQueueTableData(updatedQueue);
       }
-
-      // Remove the allocated process from the job queue
-      const updatedJobQueueTableData = jobQueueTableData.filter(p => p.id !== minIdProcess.id);
-      setJobQueueTableData([...updatedJobQueueTableData]); // Update job queue state
     }
-  }
-};
-
+  };
 
   const getColor = (processId) => {
     const process = processes.find(p => p.id === processId);
@@ -241,11 +224,11 @@ const deallocateMemory = (process) => {
                   <th style={{ border: '1px solid #000' }}>Memory Size</th>
                   <th style={{ border: '1px solid #000' }}>Arrival Time</th>
                   {processes.some(p => p.priority !== undefined) && <th style={{ border: '1px solid #000' }}>Priority</th>}
-                  <th style={{ border: '1px solid #000' }}>Status</th>
+                  <th style={{ border: '1px solid #000', width: '150px' }}>Status</th>
                 </tr>
               </thead>
               <tbody>
-                {processes.map((process, index) => (
+                {processes.filter(process => process.status !== 'Terminated' && process.status !== 'Waiting').map((process, index) => (
                   <tr key={index} style={{ ...getRowStyle(process), height: '30px' }}>
                     <td style={{ border: '1px solid #000' }}>{process.id}</td>
                     <td style={{ border: '1px solid #000' }}>{process.burstTime}</td>
@@ -271,7 +254,7 @@ const deallocateMemory = (process) => {
                   <th style={{ border: '1px solid #000' }}>Memory Size</th>
                   <th style={{ border: '1px solid #000' }}>Arrival Time</th>
                   <th style={{ border: '1px solid #000' }}>Priority</th>
-                  <th style={{ border: '1px solid #000' }}>Status</th>
+                  <th style={{ border: '1px solid #000', width: '150px' }}>Status</th>
                 </tr>
               </thead>
               <tbody>
