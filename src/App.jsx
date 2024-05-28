@@ -86,31 +86,36 @@ const App = () => {
       const updatedProcesses = prevProcesses.map(process => ({ ...process }));
 
       if (policy === 'FCFS') {
-        // FCFS policy
-        const runningProcess = updatedProcesses.find(p => p.status === 'Running');
-        if (runningProcess) {
-          runningProcess.burstTime -= 1;
-          if (runningProcess.burstTime <= 0) {
-            runningProcess.status = 'Terminated';
-            deallocateMemory(runningProcess);
-          }
-        } else {
-          const nextProcess = updatedProcesses.find(p => p.status === 'Ready' && p.arrivalTime <= currentTimeRef.current);
-          if (nextProcess) {
-            nextProcess.status = 'Running';
-          }
+      // FCFS policy
+      let runningProcess = updatedProcesses.find((p) => p.status === 'Running');
+      if (runningProcess) {
+        runningProcess.burstTime -= 1;
+        if (runningProcess.burstTime <= 0) {
+          runningProcess.status = 'Terminated';
+          deallocateMemory(runningProcess);
+          runningProcess = null;
         }
+      }
 
+      if (!runningProcess) {
+        const nextProcess = updatedProcesses.find(
+          (p) => p.status === 'Ready' && p.arrivalTime <= currentTimeRef.current
+        );
+        if (nextProcess) {
+          nextProcess.status = 'Running';
+        }
+      }
       } else if (policy === 'SJF') {
         // SJF Preemptive policy
-        const runningProcess = updatedProcesses.find(p => p.status === 'Running');
-        const readyProcesses = updatedProcesses.filter(p => p.status === 'Ready' && p.arrivalTime <= currentTimeRef.current);
+        let runningProcess = updatedProcesses.find(p => p.status === 'Running');
+        const readyProcesses = updatedProcesses.filter((p) => p.status === 'Ready' && p.arrivalTime <= currentTimeRef.current);
 
         if (runningProcess) {
           runningProcess.burstTime -= 1;
           if (runningProcess.burstTime <= 0) {
             runningProcess.status = 'Terminated';
             deallocateMemory(runningProcess);
+            runningProcess = null;
           }
         }
 
@@ -128,27 +133,32 @@ const App = () => {
 
       } else if (policy === 'Priority') {
         // Priority Preemptive policy
-        const runningProcess = updatedProcesses.find(p => p.status === 'Running');
-        const readyProcesses = updatedProcesses.filter(p => p.status === 'Ready' && p.arrivalTime <= currentTimeRef.current);
+        let runningProcess = updatedProcesses.find((p) => p.status === 'Running');
+        const readyProcesses = updatedProcesses.filter(
+          (p) => p.status === 'Ready' && p.arrivalTime <= currentTimeRef.current
+        );
+      
         if (runningProcess) {
           runningProcess.burstTime -= 1;
           if (runningProcess.burstTime <= 0) {
             runningProcess.status = 'Terminated';
             deallocateMemory(runningProcess);
+            runningProcess = null;
           } else {
+            // Check if there is a higher priority process
             const highestPriorityProcess = readyProcesses.sort((a, b) => a.priority - b.priority)[0];
             if (highestPriorityProcess && highestPriorityProcess.priority < runningProcess.priority) {
               runningProcess.status = 'Ready';
               highestPriorityProcess.status = 'Running';
+              runningProcess = highestPriorityProcess;
             }
           }
-        } else {
-          if (readyProcesses.length > 0) {
-            const highestPriorityProcess = readyProcesses.sort((a, b) => a.priority - b.priority)[0];
-            highestPriorityProcess.status = 'Running';
-          }
         }
-
+      
+        if (!runningProcess && readyProcesses.length > 0) {
+          const highestPriorityProcess = readyProcesses.sort((a, b) => a.priority - b.priority)[0];
+          highestPriorityProcess.status = 'Running';
+        }
       } else if (policy === 'RR') {
         const currentReadyQueue = [...readyQueue];
         
@@ -183,8 +193,6 @@ const App = () => {
   
         setReadyQueue(currentReadyQueue);
       }
-  
-
       // Check if there are processes in the job queue that can be allocated memory
       const updatedJobQueue = [];
       for (const process of jobQueue) {
